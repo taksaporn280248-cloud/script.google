@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบคีย์ทะเบียนสัญญา (ปีงบประมาณแยกไฟล์ & แยกประเภท)</title>
+  <!-- นำเข้า Tailwind CSS และ Google Font -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Sarabun', sans-serif;
+    }
+    /* คัสตอม Scrollbar ให้เข้ากับธีมที่เบาสบายตา */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f8fafc;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col text-slate-800 antialiased overflow-x-hidden bg-slate-50">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-slate-900 text-white shadow-sm sticky top-0 z-50 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo and App Title -->
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('dashboard')">
+          <div class="p-2 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-xl text-slate-950 font-bold text-lg flex items-center justify-center shadow-sm animate-pulse">
+            📜
+          </div>
+          <div>
+            <h1 class="text-base font-bold tracking-tight text-white sm:text-lg">ระบบคีย์ทะเบียนสัญญา</h1>
+            <p class="text-[10px] text-amber-400 font-medium tracking-wide">แยกไฟล์รายปีและแยกแท็บประเภทสัญญาใน Google Drive</p>
+          </div>
+        </div>
+        
+        <!-- Navigation Menu -->
+        <nav class="flex space-x-1 sm:space-x-2 items-center">
+          <button id="nav-dashboard" onclick="switchTab('dashboard')" class="px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150 bg-slate-800 text-amber-400 shadow-sm border-b border-amber-400">
+            หน้าหลัก
+          </button>
+          <button id="nav-form" onclick="switchTab('form')" class="px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150 text-slate-400 hover:bg-slate-800 hover:text-white">
+            เพิ่มสัญญา
+          </button>
+          <button id="nav-check" onclick="switchTab('check')" class="px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150 text-slate-400 hover:bg-slate-800 hover:text-white">
+            ตรวจสอบสัญญา
+          </button>
+
+          <!-- ลิงก์ด่วนแสดงที่ Header สำหรับเข้าดูโฟลเดอร์ Google Drive -->
+          <a id="header-drive-link" href="#" target="_blank" class="hidden md:inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 hover:bg-emerald-900/40 transition-all duration-150 ml-2">
+            <span class="mr-1">📁</span> Google Drive
+          </a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Wrapper -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    
+    <!-- Custom Dialog & Toast Container -->
+    <div id="toast-container" class="fixed top-20 right-4 z-50 pointer-events-none max-w-sm w-full"></div>
+
+    <!-- SECTION 1: DASHBOARD VIEW -->
+    <section id="view-dashboard" class="space-y-6">
+      
+      <!-- แผงควบคุมการเชื่อมโยงระบบคลาวด์และ Google Drive -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+        <div class="lg:col-span-2">
+          <h3 class="text-sm font-bold text-slate-900 flex items-center">
+            <span class="text-xl mr-2">☁️</span> ระบบจัดเก็บข้อมูลทะเบียนสัญญาพัสดุ (Google Drive Storage)
+          </h3>
+          <p class="text-xs text-slate-500 mt-1">
+            สถานะฐานข้อมูลหลัก: <span id="db-status-badge" class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[10px]">ระบบกำลังโหลด...</span>
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2 lg:justify-end">
+          <button id="test-connection-btn" onclick="checkCloudConnection()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all duration-150 border border-slate-200 inline-flex items-center shadow-xs">
+            🔄 ทดสอบการเชื่อมต่อคลาวด์
+          </button>
+          <a id="dash-drive-btn" href="#" target="_blank" class="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl transition-all duration-150 border border-emerald-200 inline-flex items-center shadow-xs">
+            <span class="mr-1.5 text-sm">📁</span> เปิดโฟลเดอร์ Google Drive
+          </a>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900">แผงควบคุมหลัก (Dashboard)</h2>
+            <p class="text-xs text-slate-500 mt-1">สรุปจำนวนข้อมูลสัญญาแต่ละประเภทแยกรายปีงบประมาณ (แยกจัดเก็บ 1 ปีงบประมาณ = 1 ไฟล์ Google Sheets)</p>
+          </div>
+          <!-- ปีงบประมาณ Selector -->
+          <div class="flex items-center space-x-3">
+            <label for="db-year-select" class="text-sm font-semibold text-slate-600 whitespace-nowrap">เลือกปีงบประมาณ :</label>
+            <select id="db-year-select" onchange="loadDashboardStats()" class="bg-white border border-slate-300 hover:border-amber-400 text-slate-800 text-sm rounded-xl focus:ring-amber-400 focus:border-amber-400 block p-2.5 font-semibold transition-colors duration-150 cursor-pointer shadow-sm">
+              <!-- Auto generated options from JS -->
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard Statistics Indicator Loader -->
+      <div id="dashboard-loader" class="hidden flex items-center justify-center p-12">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div>
+        <span class="ml-3 font-medium text-slate-500 text-sm">กำลังดาวน์โหลดข้อมูลสถิติจากคลาวด์...</span>
+      </div>
+
+      <!-- Modern Dashboard Cards Grid Container -->
+      <div id="dashboard-content" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+        <!-- Card 1: TOTAL -->
+        <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-6 shadow-sm border-b-4 border-amber-400 flex flex-col justify-between min-h-[140px] transform hover:scale-[1.01] transition-transform duration-200">
+          <div>
+            <p class="text-[10px] uppercase tracking-wider font-semibold text-amber-400">สัญญาทั้งหมดทุกประเภท</p>
+            <h3 id="stat-total" class="text-3xl font-bold mt-2">0</h3>
+          </div>
+          <div class="text-right text-[10px] opacity-80 font-medium">รายการรวมทั้งหมดในปีนี้</div>
+        </div>
+
+        <!-- Card 2: จต. -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 border-l-4 border-amber-400 flex flex-col justify-between min-h-[140px] transform hover:scale-[1.01] transition-transform duration-200">
+          <div>
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">จต.</span>
+            <p class="text-xs font-semibold text-slate-400 mt-2">จัดซื้อจัดจ้างทั่วไป</p>
+            <h3 id="stat-jt" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+          </div>
+          <div class="text-right text-[10px] text-slate-400 font-medium">แท็บ จต. ในไฟล์ปีนี้</div>
+        </div>
+
+        <!-- Card 3: ภน. -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 border-l-4 border-orange-400 flex flex-col justify-between min-h-[140px] transform hover:scale-[1.01] transition-transform duration-200">
+          <div>
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-800 border border-orange-200">ภน.</span>
+            <p class="text-xs font-semibold text-slate-400 mt-2">จัดจ้างภาคเอกชนร่วมงาน</p>
+            <h3 id="stat-pn" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+          </div>
+          <div class="text-right text-[10px] text-slate-400 font-medium">แท็บ ภน. ในไฟล์ปีนี้</div>
+        </div>
+
+        <!-- Card 4: ซข. -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 border-l-4 border-yellow-500 flex flex-col justify-between min-h-[140px] transform hover:scale-[1.01] transition-transform duration-200">
+          <div>
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-50 text-yellow-800 border border-yellow-200">ซข.</span>
+            <p class="text-xs font-semibold text-slate-400 mt-2">ซื้อขายแลกเปลี่ยน</p>
+            <h3 id="stat-sk" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+          </div>
+          <div class="text-right text-[10px] text-slate-400 font-medium">แท็บ ซข. ในไฟล์ปีนี้</div>
+        </div>
+
+        <!-- Card 5: สช. -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 border-l-4 border-slate-600 flex flex-col justify-between min-h-[140px] transform hover:scale-[1.01] transition-transform duration-200">
+          <div>
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">สช.</span>
+            <p class="text-xs font-semibold text-slate-400 mt-2">สัญญาเช่า/สัมปทาน</p>
+            <h3 id="stat-sc" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+          </div>
+          <div class="text-right text-[10px] text-slate-400 font-medium">แท็บ สช. ในไฟล์ปีนี้</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: INPUT & EDIT FORM VIEW -->
+    <section id="view-form" class="hidden space-y-6 max-w-4xl mx-auto">
+      
+      <!-- Form Header -->
+      <div class="bg-white rounded-2xl p-6 shadow-xs border border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 id="form-title" class="text-xl font-bold text-slate-900">เพิ่มรายละเอียดข้อมูลทะเบียนสัญญา</h2>
+          <p id="form-subtitle" class="text-xs text-slate-400 mt-1">กรุณากรอกข้อมูลเพื่อบันทึกลงฐานข้อมูลพัสดุ</p>
+        </div>
+        <!-- Switch back to Add mode if in Edit mode -->
+        <button id="btn-cancel-edit" onclick="resetFormToSaveMode()" class="hidden px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl transition-colors duration-150 border border-rose-200">
+          ❌ ยกเลิกการแก้ไข / เพิ่มสัญญาใหม่
+        </button>
+      </div>
+
+      <!-- Main Input Sheet Form Container -->
+      <form id="contract-form" onsubmit="submitForm(event)" class="space-y-6">
+        <!-- Hidden core tracking elements -->
+        <input type="hidden" id="field-col1" value=""> 
+        <input type="hidden" id="edit-row-idx" value="">
+        <input type="hidden" id="edit-original-type" value="">
+        <input type="hidden" id="edit-original-year" value="">
+
+        <!-- VISUAL CONTAINER GROUP 1: Core Configuration -->
+        <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200/80 relative overflow-hidden">
+          <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
+            <!-- ปีงบประมาณ -->
+            <div class="md:col-span-1">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ปีงบประมาณ <span class="text-amber-500">*</span></label>
+              <select id="field-year" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl p-3 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150 cursor-pointer" required>
+                <!-- Dynamic List from JS -->
+              </select>
+            </div>
+            
+            <!-- ประเภททะเบียนสัญญา -->
+            <div class="md:col-span-1">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ประเภททะเบียนสัญญา <span class="text-amber-500">*</span></label>
+              <select id="field-type" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl p-3 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150 cursor-pointer" required>
+                <option value="จต.">จต.</option>
+                <option value="ภน.">ภน.</option>
+                <option value="ซข.">ซข.</option>
+                <option value="สช.">สช.</option>
+              </select>
+            </div>
+
+            <!-- เลขที่/วันที่สัญญา -->
+            <div class="md:col-span-1">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">เลขที่/วันที่สัญญา <span class="text-amber-500">*</span></label>
+              <div class="relative">
+                <input type="text" id="field-col3" onblur="validateUniqueContractNo()" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 pr-10 text-sm font-bold focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150" required>
+                <span id="col3-status-icon" class="absolute inset-y-0 right-0 pr-3 flex items-center text-sm"></span>
+              </div>
+              <p id="col3-warn" class="hidden text-[10px] text-rose-500 mt-1 font-semibold"></p>
+            </div>
+
+            <!-- ลงวันที่ -->
+            <div class="md:col-span-1">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ลงวันที่ <span class="text-amber-500">*</span></label>
+              <input type="date" id="field-col2" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150" required>
+            </div>
+          </div>
+        </div>
+
+        <!-- VISUAL CONTAINER GROUP 2: Core Details -->
+        <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200/80 relative overflow-hidden">
+          <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <!-- ชื่อสัญญา -->
+            <div class="md:col-span-2">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ชื่อสัญญา <span class="text-amber-500">*</span></label>
+              <input type="text" id="field-col4" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150" required>
+            </div>
+
+            <!-- จำนวนเงิน -->
+            <div class="md:col-span-1">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">จำนวนเงิน <span class="text-amber-500">*</span></label>
+              <input type="number" step="0.01" id="field-col5" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm font-bold focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150" required>
+            </div>
+
+            <!-- คู่สัญญา -->
+            <div class="md:col-span-2">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">คู่สัญญา <span class="text-amber-500">*</span></label>
+              <input type="text" id="field-col6" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150" required>
+            </div>
+
+            <!-- รหัสงบประมาณ -->
+            <div class="md:col-span-1">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">รหัสงบประมาณ</label>
+              <input type="text" id="field-col7" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+          </div>
+        </div>
+
+        <!-- VISUAL CONTAINER GROUP 3: Dates & Finances -->
+        <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200/80 relative overflow-hidden">
+          <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+            <!-- จำนวนงวด -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">จำนวนงวด</label>
+              <input type="number" id="field-col8" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- วันเริ่มต้นสัญญา -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">วันเริ่มต้นสัญญา</label>
+              <input type="date" id="field-col9" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- วันสิ้นสุดสัญญา -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">วันสิ้นสุดสัญญา</label>
+              <input type="date" id="field-col10" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- จำนวนงบประมาณ -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">จำนวนงบประมาณ</label>
+              <input type="number" step="0.01" id="field-col13" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- ราคากลาง -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ราคากลาง</label>
+              <input type="number" step="0.01" id="field-col14" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- การดำเนินงานพัสดุ (วิธีจัดหา) -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">การดำเนินงานพัสดุ (วิธีจัดหา)</label>
+              <select id="field-col11" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 text-sm rounded-xl p-3 focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150 cursor-pointer">
+                <option value=""></option>
+                <option value="วิธีเฉพาะเจาะจง">วิธีเฉพาะเจาะจง</option>
+                <option value="วิธีคัดเลือก">วิธีคัดเลือก</option>
+                <option value="วิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)">วิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)</option>
+                <option value="วิธีตกลงราคา">วิธีตกลงราคา</option>
+                <option value="วิธีสอบราคา">วิธีสอบราคา</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- VISUAL CONTAINER GROUP 4: Procurement Records -->
+        <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200/80 relative overflow-hidden">
+          <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+            <!-- ใบขอจัดหา /บันทึก -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ใบขอจัดหา /บันทึก</label>
+              <input type="text" id="field-col12" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- รายงานขอซื้อขอจ้าง -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">รายงานขอซื้อขอจ้าง</label>
+              <input type="text" id="field-col15" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- ประกาศร่าง TOR -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ประกาศร่าง TOR</label>
+              <input type="text" id="field-col16" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- รายงานปรับปรุงร่าง TOR -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">รายงานปรับปรุงร่าง TOR</label>
+              <input type="text" id="field-col17" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- เลขที่ประกาศ/หนังสือเชิญ -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">เลขที่ประกาศ/หนังสือเชิญ</label>
+              <input type="text" id="field-col18" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- จำนวนผู้เสนอราคา -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">จำนวนผู้เสนอราคา</label>
+              <input type="number" id="field-col19" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- วันที่ประกาศผล/ยกเลิก -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">วันที่ประกาศผล/ยกเลิก</label>
+              <input type="text" id="field-col20" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- คำสั่ง คกก.ตรวจรับ -->
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">คำสั่ง คกก.ตรวจรับ</label>
+              <input type="text" id="field-col21" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+          </div>
+        </div>
+
+        <!-- VISUAL CONTAINER GROUP 5: Guarantee & Storage -->
+        <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200/80 relative overflow-hidden">
+          <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+            <!-- หลักประกัน -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">หลักประกัน</label>
+              <input type="text" id="field-col22" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- การจัดเก็บเอกสาร -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">การจัดเก็บเอกสาร</label>
+              <input type="text" id="field-col23" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+
+            <!-- รับประกันความชำรุด -->
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">รับประกันความชำรุด</label>
+              <input type="text" id="field-col24" class="w-full bg-slate-50/80 border border-slate-200 text-slate-800 rounded-xl p-3 text-sm focus:bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none transition-all duration-150">
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Submission Button Container -->
+        <div class="bg-slate-900 text-white p-6 rounded-2xl shadow-md border border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <p class="text-xs text-slate-400 font-medium">หมายเหตุ: ฟิลด์ข้อมูลที่มีเครื่องหมายดอกจัน <span class="text-amber-400 font-bold">*</span> มีความสำคัญจำเป็นต้องกรอกก่อนทำการส่งข้อมูล</p>
+          <div class="flex items-center space-x-3 self-end md:self-auto">
+            <button type="button" onclick="clearForm()" class="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-xl transition-all duration-150 border border-slate-700">
+              🧹 ล้างแบบฟอร์ม
+            </button>
+            <button type="submit" id="btn-submit-form" class="px-8 py-3 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 text-xs font-bold rounded-xl hover:brightness-105 active:scale-98 transition-all duration-150 flex items-center shadow-lg shadow-amber-500/10">
+              <span id="submit-text">💾 บันทึกข้อมูลสัญญา</span>
+              <!-- Spin Loader within button -->
+              <div id="submit-spinner" class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-slate-950 ml-2"></div>
+            </button>
+          </div>
+        </div>
+
+      </form>
+    </section>
+
+    <!-- SECTION 3: SEARCH & EDIT CHECK VIEW -->
+    <section id="view-check" class="hidden space-y-6">
+      
+      <!-- Top Search Control Panel -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+        <h2 class="text-xl font-bold text-slate-900 mb-1">ตรวจสอบและค้นหาข้อมูลทะเบียนสัญญา</h2>
+        <p class="text-xs text-slate-500 mb-6">กรองข้อมูลด้วยปีงบประมาณ และค้นหาจากเลขที่สัญญา ชื่อสัญญา หรือคู่สัญญา</p>
+        
+        <form onsubmit="handleSearch(event)" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <!-- เลือกปีงบประมาณ -->
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ระบุปีงบประมาณ :</label>
+            <select id="search-year" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 p-3 font-semibold transition-all duration-150 cursor-pointer">
+              <!-- Dynamic Options -->
+            </select>
+          </div>
+
+          <!-- กรอกคำค้นหา -->
+          <div class="md:col-span-2">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">คำค้นหาหลัก (Keyword) :</label>
+            <input type="text" id="search-keyword" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 p-3 focus:outline-none transition-all duration-150" placeholder="พิมพ์ชื่อคู่สัญญา, รหัส, เลขที่ หรือชื่อสัญญา...">
+          </div>
+
+          <!-- ปุ่มกระตุ้นการค้นหา -->
+          <div class="flex items-end">
+            <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold py-3 px-4 rounded-xl shadow-sm transition-colors duration-150 flex items-center justify-center space-x-2 border border-slate-850">
+              <span>🔍 ค้นหารายการ</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Search Processing Loader -->
+      <div id="search-loader" class="hidden flex items-center justify-center p-12">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div>
+        <span class="ml-3 font-medium text-slate-500 text-sm">กำลังค้นหาข้อมูลจากระบบคลาวด์ชีต...</span>
+      </div>
+
+      <!-- Results Area -->
+      <div id="search-results-area" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        
+        <!-- Result Stats bar -->
+        <div class="bg-slate-50 px-6 py-4 border-b border-slate-200/60 flex justify-between items-center flex-wrap gap-2">
+          <span id="results-count" class="text-xs font-bold text-slate-500">ค้นพบรายการผลลัพธ์: 0 สัญญา</span>
+          <span class="text-[10px] text-slate-400 font-semibold">* แสดงข้อมูลที่แยกตามแต่ละปีงบประมาณและจัดเรียงเลขที่สัญญาจากมากไปน้อย</span>
+        </div>
+
+        <!-- Scrollable Responsive Data Table -->
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-100 text-left">
+            <thead class="bg-slate-900 text-white">
+              <tr>
+                <th scope="col" class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase">ประเภท</th>
+                <th scope="col" class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase">ลงวันที่</th>
+                <th scope="col" class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase">เลขที่/วันที่สัญญา</th>
+                <th scope="col" class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase">ชื่อสัญญา</th>
+                <th scope="col" class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase">จำนวนเงิน (บาท)</th>
+                <th scope="col" class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase">คู่สัญญา</th>
+                <th scope="col" class="px-6 py-3.5 text-xs font-bold tracking-wider uppercase text-center">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="results-table-body" class="bg-white divide-y divide-slate-100">
+              <tr>
+                <td colspan="7" class="px-6 py-12 text-center text-slate-400 font-medium text-xs">
+                  กรุณากดค้นหาข้อมูลเพื่อแสดงผลลัพธ์ในตารางนี้
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- App Footer -->
+  <footer class="bg-slate-900 border-t border-slate-800 py-6 mt-12">
+    <div class="max-w-7xl mx-auto px-4 text-center">
+      <p class="text-[10px] text-slate-500 font-medium">© 2026 ระบบคีย์ทะเบียนสัญญาหน่วยงานรัฐบาลไทย (Production Edition). สงวนลิขสิทธิ์ทั้งหมดตามกฎหมาย</p>
+      <p class="text-[9px] text-slate-600 mt-1">พัฒนาด้วย Google Apps Script + Google Sheets Database + Tailwind CSS</p>
+    </div>
+  </footer>
+
+  <script>
+    // =========================================================================
+    // ⚙️ [ตั้งค่า] ลิงก์ระบบหลัก Google Apps Script และ Google Drive
+    // =========================================================================
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbylzNjLXvH2_YRz_yJwz_k-QfsH-_b9f3AttCC6bD00uwslZSQbir7jNwg0DWhWm0I/exec";
+    const GOOGLE_DRIVE_URL = "https://drive.google.com/drive/folders/1e8fHUouEuiQFUHKXa4a96oEMaofkWjN-";
+
+    // ตัวแปรเก็บสถานะการเชื่อมต่อ
+    let isCloudConnected = false;
+
+    // ---------------------------------------------------------
+    // ฟังก์ชันตรวจสอบและตั้งค่าลิงก์เชื่อมต่อไปยังคลาวด์
+    // ---------------------------------------------------------
+    function initCloudLinks() {
+      document.getElementById('header-drive-link').href = GOOGLE_DRIVE_URL;
+      document.getElementById('dash-drive-btn').href = GOOGLE_DRIVE_URL;
+      checkCloudConnection();
+    }
+
+    // ฟังก์ชันทดสอบการเชื่อมต่อ API ของ Google Apps Script Web App
+    function checkCloudConnection() {
+      const badge = document.getElementById('db-status-badge');
+      badge.innerText = "⏳ กำลังตรวจสอบสิทธิ์เชื่อมต่อคลาวด์...";
+      badge.className = "px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]";
+
+      // ส่ง Request สั้น ๆ ไปยัง API ด้วยวิธีบายพาส CORS เพื่อทดสอบ
+      fetch(WEB_APP_URL, {
+        method: "POST",
+        mode: "cors",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8" // การส่งเป็น text/plain จะป้องกันเบราว์เซอร์ส่ง OPTIONS request (CORS Preflight)
+        },
+        body: JSON.stringify({ action: "getDashboardStats", year: getThaiFiscalYear().toString() })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data && data.success) {
+          isCloudConnected = true;
+          badge.innerText = "🟢 เชื่อมต่อ Google Sheets คลาวด์โดยตรงสำเร็จ (Online)";
+          badge.className = "px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]";
+          showToast("เชื่อมต่อฐานข้อมูล Google Sheets เรียบร้อยแล้ว", "success");
+        } else {
+          setOfflineStatus("พบปัญหากล่องข้อมูลปลายทางปฏิเสธการเข้าถึง");
+        }
+      })
+      .catch(error => {
+        console.warn("GAS Connection failed. Using local storage fallback. Error:", error);
+        setOfflineStatus("โหมดออฟไลน์จำลอง (บันทึกลงหน่วยความจำเบราว์เซอร์ชั่วคราว)");
+      });
+    }
+
+    function setOfflineStatus(message) {
+      isCloudConnected = false;
+      const badge = document.getElementById('db-status-badge');
+      badge.innerText = `🟡 ${message}`;
+      badge.className = "px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold text-[10px]";
+    }
+
+    // ---------------------------------------------------------
+    // ตัวควบคุมการสื่อสารข้อมูล (สลับระหว่าง Apps Script กับ LocalStorage)
+    // ---------------------------------------------------------
+    function callAPI(actionName, paramsPayload, successCallback, failureCallback) {
+      if (isCloudConnected) {
+        // จัดโครงสร้างตัวแปรของ Payload ให้ตรงกับฝั่ง GAS Code.gs หลังบ้าน
+        const requestPayload = {
+          action: actionName,
+          year: paramsPayload[0] || "",
+          type: paramsPayload[1] || "",
+          contractNo: actionName === "checkDuplicateContractNo" ? paramsPayload[2] : "",
+          excludeRowIdx: actionName === "checkDuplicateContractNo" ? paramsPayload[3] : "",
+          keyword: actionName === "searchContracts" ? paramsPayload[1] : "",
+          dataObj: (actionName === "saveNewContract" || actionName === "updateExistingContract") ? paramsPayload[paramsPayload.length - 1] : null
+        };
+
+        if (actionName === "updateExistingContract") {
+          requestPayload.rowNum = paramsPayload[2];
+        }
+
+        // ส่งข้อมูลไปยังเซิร์ฟเวอร์
+        fetch(WEB_APP_URL, {
+          method: "POST",
+          mode: "cors",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: JSON.stringify(requestPayload)
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP Error Status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data && data.success) {
+            successCallback(data);
+          } else {
+            successCallback({ success: false, error: data.error || "เซิร์ฟเวอร์รายงานความผิดพลาด" });
+          }
+        })
+        .catch(error => {
+          console.error("Network Fetch Failure:", error);
+          // ทำงานต่อด้วยระบบจำลองแบบออฟไลน์ทันทีเพื่อประสบการณ์ใช้งานที่ไหลลื่น
+          executeLocalStorageFallback(actionName, paramsPayload, successCallback, failureCallback);
+        });
+      } else {
+        // ทำงานออฟไลน์
+        executeLocalStorageFallback(actionName, paramsPayload, successCallback, failureCallback);
+      }
+    }
+
+    // ---------------------------------------------------------
+    // ระบบดักเก็บข้อมูลออฟไลน์ชั่วคราว (LocalStorage Fallback)
+    // ---------------------------------------------------------
+    const getMockFileForYear = (year) => {
+      try {
+        const key = 'gov_contracts_file_' + year;
+        const fileData = localStorage.getItem(key);
+        return fileData ? JSON.parse(fileData) : { "จต.": [], "ภน.": [], "ซข.": [], "สช.": [] };
+      } catch (e) {
+        return { "จต.": [], "ภน.": [], "ซข.": [], "สช.": [] };
+      }
+    };
+
+    const saveMockFileForYear = (year, fileObj) => {
+      const key = 'gov_contracts_file_' + year;
+      localStorage.setItem(key, JSON.stringify(fileObj));
+    };
+
+    function executeLocalStorageFallback(actionName, paramsPayload, successCallback, failureCallback) {
+      setTimeout(() => {
+        try {
+          if (actionName === 'getDashboardStats') {
+            const year = paramsPayload[0];
+            const file = getMockFileForYear(year);
+            const stats = { total: 0, "จต.": 0, "ภน.": 0, "ซข.": 0, "สช.": 0 };
+            
+            Object.keys(file).forEach(type => {
+              const count = file[type].length;
+              stats[type] = count;
+              stats.total += count;
+            });
+            successCallback({ success: true, stats: stats });
+          } 
+          else if (actionName === 'checkDuplicateContractNo') {
+            const year = paramsPayload[0];
+            const type = paramsPayload[1];
+            const contractNo = paramsPayload[2];
+            const excludeRowIdx = paramsPayload[3];
+            
+            const file = getMockFileForYear(year);
+            const list = file[type] || [];
+            let isDuplicate = false;
+            
+            for (let i = 0; i < list.length; i++) {
+              const item = list[i];
+              if (excludeRowIdx && parseInt(excludeRowIdx, 10) === item.rowNum) continue;
+              if (item.data["เลขที่/วันที่สัญญา"].trim() === contractNo.trim()) {
+                isDuplicate = true;
+                break;
+              }
+            }
+            successCallback({ success: true, isDuplicate: isDuplicate });
+          } 
+          else if (actionName === 'saveNewContract') {
+            const year = paramsPayload[0];
+            const type = paramsPayload[1];
+            const dataObj = paramsPayload[2];
+            
+            const file = getMockFileForYear(year);
+            const list = file[type] || [];
+            const nextRowNum = list.length + 2; // แถวที่ 1 เป็น Header ของ Sheets เสมอ
+            
+            dataObj["ลำดับ"] = list.length + 1;
+            list.push({ rowNum: nextRowNum, data: dataObj });
+            
+            file[type] = list;
+            saveMockFileForYear(year, file);
+            successCallback({ success: true });
+          } 
+          else if (actionName === 'updateExistingContract') {
+            const year = paramsPayload[0];
+            const type = paramsPayload[1];
+            const rowNum = parseInt(paramsPayload[2], 10);
+            const dataObj = paramsPayload[3];
+            
+            const file = getMockFileForYear(year);
+            const list = file[type] || [];
+            const foundIdx = list.findIndex(item => item.rowNum === rowNum);
+            
+            if (foundIdx !== -1) {
+              list[foundIdx].data = dataObj;
+              file[type] = list;
+              saveMockFileForYear(year, file);
+              successCallback({ success: true });
+            } else {
+              failureCallback(new Error("ไม่พบสัญญาแถวดังกล่าวในฐานข้อมูลจำลอง"));
+            }
+          } 
+          else if (actionName === 'searchContracts') {
+            const year = paramsPayload[0];
+            const keyword = paramsPayload[1];
+            const searchKey = keyword.toLowerCase().trim();
+            
+            const file = getMockFileForYear(year);
+            let results = [];
+            
+            Object.keys(file).forEach(type => {
+              const list = file[type];
+              list.forEach(item => {
+                const cNo = (item.data["เลขที่/วันที่สัญญา"] || "").toString().toLowerCase();
+                const cName = (item.data["ชื่อสัญญา"] || "").toString().toLowerCase();
+                const cCont = (item.data["คู่สัญญา"] || "").toString().toLowerCase();
+                
+                if (!searchKey || cNo.includes(searchKey) || cName.includes(searchKey) || cCont.includes(searchKey)) {
+                  results.push({
+                    year: parseInt(year, 10),
+                    type: type,
+                    rowNum: item.rowNum,
+                    data: item.data
+                  });
+                }
+              });
+            });
+            
+            // จัดเรียงเลขที่สัญญาจากมากไปน้อย
+            results.sort((a, b) => {
+              const noA = (a.data["เลขที่/วันที่สัญญา"] || "").toString();
+              const noB = (b.data["เลขที่/วันที่สัญญา"] || "").toString();
+              return noB.localeCompare(noA, undefined, { numeric: true, sensitivity: 'base' });
+            });
+            
+            successCallback({ success: true, results: results });
+          }
+        } catch (err) {
+          failureCallback(err);
+        }
+      }, 100);
+    }
+
+    // สร้างข้อมูลตั้งต้นกรณีเพิ่งรันหน้าเว็บครั้งแรกเพื่อสอดคล้องกับตัวอย่าง
+    const initMockSetup = () => {
+      const testYear = 2569;
+      const key = 'gov_contracts_file_' + testYear;
+      if (!localStorage.getItem(key)) {
+        const mockFile = {
+          "จต.": [
+            {
+              rowNum: 2,
+              data: {
+                "ลำดับ": 1,
+                "ลงวันที่": "2026-05-10",
+                "เลขที่/วันที่สัญญา": "จต.001/2569",
+                "ชื่อสัญญา": "จัดซื้อคอมพิวเตอร์และอุปกรณ์สำนักงานส่วนกลาง",
+                "จำนวนเงิน": 450000.00,
+                "คู่สัญญา": "บริษัท ไทยเทคโนโลยีแอนด์โซลูชั่น จำกัด",
+                "รหัสงบประมาณ": "6911002345",
+                "จำนวนงวด": 1,
+                "วันเริ่มต้นสัญญา": "2026-05-15",
+                "วันสิ้นสุดสัญญา": "2026-06-15",
+                "การดำเนินงานพัสดุ (วิธีจัดหา)": "วิธีเฉพาะเจาะจง",
+                "ใบขอจัดหา /บันทึก": "บก.102/2569",
+                "จำนวนงบประมาณ": 500000.00,
+                "ราคากลาง": 480000.00,
+                "รายงานขอซื้อขอจ้าง": "รายงานเลขที่ 05/2569",
+                "ประกาศร่าง TOR": "ผ่านบอร์ดประกาศประชาสัมพันธ์",
+                "รายงานปรับปรุงร่าง TOR": "-",
+                "เลขที่ประกาศ/หนังสือเชิญ": "นส.024/2569",
+                "จำนวนผู้เสนอราคา": 3,
+                "วันที่ประกาศผล/ยกเลิก": "2026-05-08",
+                "คำสั่ง คกก.ตรวจรับ": "คำสั่งกรมที่ 12/2569",
+                "หลักประกัน": "หนังสือค้ำประกันธนาคาร เลขที่ SCB8821",
+                "การจัดเก็บเอกสาร": "ตู้จัดเก็บข้อมูล 3 แฟ้มเอกสาร 2",
+                "รับประกันความชำรุด": "รับประกันตัวอุปกรณ์ 1 ปีบริบูรณ์"
+              }
+            },
+            {
+              rowNum: 3,
+              data: {
+                "ลำดับ": 2,
+                "ลงวันที่": "2026-05-18",
+                "เลขที่/วันที่สัญญา": "จต.002/2569",
+                "ชื่อสัญญา": "จัดจ้างระบบคลาวด์เน็ตเวิร์คความเร็วสูงเพิ่มเติม",
+                "จำนวนเงิน": 780000.00,
+                "คู่สัญญา": "บริษัท โทรคมนาคมดิจิทัลเทค จำกัด",
+                "รหัสงบประมาณ": "6911002991",
+                "จำนวนงวด": 1,
+                "วันเริ่มต้นสัญญา": "2026-05-20",
+                "วันสิ้นสุดสัญญา": "2026-08-20",
+                "การดำเนินงานพัสดุ (วิธีจัดหา)": "วิธีตกลงราคา",
+                "ใบขอจัดหา /บันทึก": "บก.115/2569",
+                "จำนวนงบประมาณ": 800000.00,
+                "ราคากลาง": 785000.00,
+                "รายงานขอซื้อขอจ้าง": "รายงานเลขที่ 12/2569",
+                "ประกาศร่าง TOR": "-",
+                "รายงานปรับปรุงร่าง TOR": "-",
+                "เลขที่ประกาศ/หนังสือเชิญ": "นส.033/2569",
+                "จำนวนผู้เสนอราคา": 2,
+                "วันที่ประกาศผล/ยกเลิก": "2026-05-15",
+                "คำสั่ง คกก.ตรวจรับ": "คำสั่งกรมที่ 15/2569",
+                "หลักประกัน": "หนังสือค้ำประกันธนาคาร เลขที่ KBANK1192",
+                "การจัดเก็บเอกสาร": "ตู้จัดเก็บข้อมูล 3 แฟ้มเอกสาร 3",
+                "รับประกันความชำรุด": "รับประกันการบริการ 1 ปี"
+              }
+            }
+          ],
+          "ภน.": [],
+          "ซข.": [],
+          "สช.": []
+        };
+        saveMockFileForYear(testYear, mockFile);
+      }
+    };
+    initMockSetup();
+
+
+    // ---------------------------------------------------------
+    // ตรรกะฝั่ง Front-end จัดการระบบแบบฟอร์มและการค้นหา
+    // ---------------------------------------------------------
+    const CURRENT_BUDGET_YEAR = getThaiFiscalYear();
+    const START_YEAR = 2565; 
+    const END_YEAR = CURRENT_BUDGET_YEAR + 1; 
+    
+    let isEditing = false;
+    let validatedNoState = { isValid: true, checkingNo: "" };
+
+    window.onload = function() {
+      setupYearSelectors();
+      initCloudLinks(); 
+      loadDashboardStats();
+    };
+
+    // คำนวณปีงบประมาณไทยในปัจจุบัน
+    function getThaiFiscalYear() {
+      const now = new Date();
+      const westernYear = now.getFullYear();
+      const thaiYear = westernYear + 543;
+      const month = now.getMonth() + 1;
+      if (month >= 10) {
+        return thaiYear + 1;
+      }
+      return thaiYear;
+    }
+
+    function setupYearSelectors() {
+      const dbSelect = document.getElementById("db-year-select");
+      const formSelect = document.getElementById("field-year");
+      const searchSelect = document.getElementById("search-year");
+      
+      dbSelect.innerHTML = "";
+      formSelect.innerHTML = "";
+      searchSelect.innerHTML = "";
+
+      for (let y = END_YEAR; y >= START_YEAR; y--) {
+        const opt1 = new Option("ปีงบประมาณ " + y, y);
+        const opt2 = new Option("ปีงบประมาณ " + y, y);
+        const opt3 = new Option("ปีงบประมาณ " + y, y);
+        
+        if (y === CURRENT_BUDGET_YEAR) {
+          opt1.selected = true;
+          opt2.selected = true;
+          opt3.selected = true;
+        }
+        
+        dbSelect.add(opt1);
+        formSelect.add(opt2);
+        searchSelect.add(opt3);
+      }
+    }
+
+    function switchTab(tabId) {
+      document.getElementById("view-dashboard").classList.add("hidden");
+      document.getElementById("view-form").classList.add("hidden");
+      document.getElementById("view-check").classList.add("hidden");
+      
+      const navButtons = ["nav-dashboard", "nav-form", "nav-check"];
+      navButtons.forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        btn.className = "px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150 text-slate-400 hover:bg-slate-800 hover:text-white";
+      });
+      
+      const targetView = document.getElementById("view-" + tabId);
+      if (targetView) targetView.classList.remove("hidden");
+      
+      const activeBtn = document.getElementById("nav-" + tabId);
+      if (activeBtn) {
+        activeBtn.className = "px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150 bg-slate-800 text-amber-400 shadow-sm border-b border-amber-400";
+      }
+
+      if (tabId === 'dashboard') {
+        loadDashboardStats();
+      }
+    }
+
+    function loadDashboardStats() {
+      const selectedYear = document.getElementById("db-year-select").value;
+      const loader = document.getElementById("dashboard-loader");
+      const content = document.getElementById("dashboard-content");
+      
+      loader.classList.remove("hidden");
+      content.classList.add("opacity-40");
+
+      callAPI('getDashboardStats', [selectedYear], function(response) {
+        loader.classList.add("hidden");
+        content.classList.remove("opacity-40");
+        
+        if (response && response.success) {
+          document.getElementById("stat-total").innerText = formatNumber(response.stats.total);
+          document.getElementById("stat-jt").innerText = formatNumber(response.stats["จต."]);
+          document.getElementById("stat-pn").innerText = formatNumber(response.stats["ภน."]);
+          document.getElementById("stat-sk").innerText = formatNumber(response.stats["ซข."]);
+          document.getElementById("stat-sc").innerText = formatNumber(response.stats["สช."]);
+        } else {
+          showToast("ไม่สามารถเรียกดูสถิติได้: " + (response.error || "ข้อผิดพลาดที่ไม่ทราบสาเหตุ"), "danger");
+        }
+      }, function(error) {
+        loader.classList.add("hidden");
+        content.classList.remove("opacity-40");
+        showToast("ล้มเหลวในการเชื่อมโยงเครือข่าย: " + error.message, "danger");
+      });
+    }
+
+    function validateUniqueContractNo() {
+      const year = document.getElementById("field-year").value;
+      const type = document.getElementById("field-type").value;
+      const contractNo = document.getElementById("field-col3").value.trim();
+      
+      const warnP = document.getElementById("col3-warn");
+      const iconSpan = document.getElementById("col3-status-icon");
+      
+      if (!contractNo) {
+        warnP.classList.add("hidden");
+        iconSpan.innerHTML = "";
+        validatedNoState = { isValid: true, checkingNo: "" };
+        return;
+      }
+
+      const editRowIdx = isEditing ? document.getElementById("edit-row-idx").value : "";
+      iconSpan.innerHTML = "⏳";
+      
+      callAPI('checkDuplicateContractNo', [year, type, contractNo, editRowIdx], function(response) {
+        if (response && response.success) {
+          if (response.isDuplicate) {
+            warnP.innerText = "❌ เลขที่สัญญานี้มีอยู่แล้วในไฟล์ระบบของปีและประเภทดังกล่าว!";
+            warnP.classList.remove("hidden");
+            iconSpan.innerHTML = "❌";
+            validatedNoState = { isValid: false, checkingNo: contractNo };
+          } else {
+            warnP.classList.add("hidden");
+            iconSpan.innerHTML = "✅";
+            validatedNoState = { isValid: true, checkingNo: contractNo };
+          }
+        } else {
+          iconSpan.innerHTML = "⚠️";
+        }
+      }, function() {
+        iconSpan.innerHTML = "⚠️";
+      });
+    }
+
+    function submitForm(event) {
+      event.preventDefault();
+      
+      const year = document.getElementById("field-year").value;
+      const type = document.getElementById("field-type").value;
+      const col3 = document.getElementById("field-col3").value.trim();
+      
+      if (!validatedNoState.isValid && validatedNoState.checkingNo === col3) {
+        showToast("ไม่สามารถดำเนินการได้ เนื่องจากเลขที่สัญญายังซ้ำกับในระบบอยู่", "danger");
+        document.getElementById("field-col3").focus();
+        return;
+      }
+
+      const dataObj = {
+        "ลำดับ": isEditing ? parseInt(document.getElementById("field-col1").value, 10) : "",
+        "ลงวันที่": document.getElementById("field-col2").value,
+        "เลขที่/วันที่สัญญา": col3,
+        "ชื่อสัญญา": document.getElementById("field-col4").value.trim(),
+        "จำนวนเงิน": parseFloat(document.getElementById("field-col5").value) || 0,
+        "คู่สัญญา": document.getElementById("field-col6").value.trim(),
+        "รหัสงบประมาณ": document.getElementById("field-col7").value.trim(),
+        "จำนวนงวด": parseInt(document.getElementById("field-col8").value, 10) || "",
+        "วันเริ่มต้นสัญญา": document.getElementById("field-col9").value,
+        "วันสิ้นสุดสัญญา": document.getElementById("field-col10").value,
+        "การดำเนินงานพัสดุ (วิธีจัดหา)": document.getElementById("field-col11").value,
+        "ใบขอจัดหา /บันทึก": document.getElementById("field-col12").value.trim(),
+        "จำนวนงบประมาณ": parseFloat(document.getElementById("field-col13").value) || "",
+        "ราคากลาง": parseFloat(document.getElementById("field-col14").value) || "",
+        "รายงานขอซื้อขอจ้าง": document.getElementById("field-col15").value.trim(),
+        "ประกาศร่าง TOR": document.getElementById("field-col16").value.trim(),
+        "รายงานปรับปรุงร่าง TOR": document.getElementById("field-col17").value.trim(),
+        "เลขที่ประกาศ/หนังสือเชิญ": document.getElementById("field-col18").value.trim(),
+        "จำนวนผู้เสนอราคา": parseInt(document.getElementById("field-col19").value, 10) || "",
+        "วันที่ประกาศผล/ยกเลิก": document.getElementById("field-col20").value.trim(),
+        "คำสั่ง คกก.ตรวจรับ": document.getElementById("field-col21").value.trim(),
+        "หลักประกัน": document.getElementById("field-col22").value.trim(),
+        "การจัดเก็บเอกสาร": document.getElementById("field-col23").value.trim(),
+        "รับประกันความชำรุด": document.getElementById("field-col24").value.trim()
+      };
+
+      const btnSubmit = document.getElementById("btn-submit-form");
+      const submitText = document.getElementById("submit-text");
+      const spinner = document.getElementById("submit-spinner");
+      
+      btnSubmit.disabled = true;
+      spinner.classList.remove("hidden");
+      
+      if (isEditing) {
+        const rowNum = document.getElementById("edit-row-idx").value;
+        const originalYear = document.getElementById("edit-original-year").value;
+        const originalType = document.getElementById("edit-original-type").value;
+        
+        submitText.innerText = "กำลังปรับปรุงข้อมูลในฐานข้อมูล...";
+        
+        callAPI('updateExistingContract', [originalYear, originalType, rowNum, dataObj], function(response) {
+          btnSubmit.disabled = false;
+          spinner.classList.add("hidden");
+          submitText.innerText = "💾 บันทึกข้อมูลสัญญา";
+          
+          if (response && response.success) {
+            showToast("อัปเดตแก้ไขข้อมูลสัญญาเสร็จเรียบร้อยแล้ว!", "success");
+            resetFormToSaveMode();
+            switchTab("check");
+            document.getElementById("search-year").value = year;
+            handleSearch(null);
+          } else {
+            showToast("เกิดข้อผิดพลาดในการปรับปรุงข้อมูล: " + response.error, "danger");
+          }
+        }, function(error) {
+          btnSubmit.disabled = false;
+          spinner.classList.add("hidden");
+          submitText.innerText = "💾 บันทึกข้อมูลสัญญา";
+          showToast("ล้มเหลวทางการเชื่อมต่อ: " + error.message, "danger");
+        });
+
+      } else {
+        submitText.innerText = "กำลังส่งข้อมูลเข้าสู่คลาวด์...";
+        
+        callAPI('saveNewContract', [year, type, dataObj], function(response) {
+          btnSubmit.disabled = false;
+          spinner.classList.add("hidden");
+          submitText.innerText = "💾 บันทึกข้อมูลสัญญา";
+          
+          if (response && response.success) {
+            showToast("บันทึกข้อมูลสัญญาแยกจัดเก็บเรียบร้อยแล้ว!", "success");
+            clearForm(); 
+          } else {
+            showToast("เกิดข้อผิดพลาดในการบันทึก: " + response.error, "danger");
+          }
+        }, function(error) {
+          btnSubmit.disabled = false;
+          spinner.classList.add("hidden");
+          submitText.innerText = "💾 บันทึกข้อมูลสัญญา";
+          showToast("ข้อผิดพลาดฝั่งเซิร์ฟเวอร์: " + error.message, "danger");
+        });
+      }
+    }
+
+    function handleSearch(event) {
+      if (event) event.preventDefault();
+      
+      const year = document.getElementById("search-year").value;
+      const keyword = document.getElementById("search-keyword").value;
+      
+      const loader = document.getElementById("search-loader");
+      const resultsArea = document.getElementById("search-results-area");
+      const tableBody = document.getElementById("results-table-body");
+      const countLabel = document.getElementById("results-count");
+      
+      loader.classList.remove("hidden");
+      resultsArea.classList.add("opacity-40");
+      
+      callAPI('searchContracts', [year, keyword], function(response) {
+        loader.classList.add("hidden");
+        resultsArea.classList.remove("opacity-40");
+        
+        if (response && response.success) {
+          const results = response.results;
+          countLabel.innerText = "ค้นพบรายการผลลัพธ์: " + results.length + " สัญญา (เรียงลำดับจากเลขที่สัญญามากไปหาน้อย)";
+          
+          if (results.length === 0) {
+            tableBody.innerHTML = `
+              <tr>
+                <td colspan="7" class="px-6 py-12 text-center text-slate-400 font-semibold text-xs">
+                  ⚠️ ไม่พบข้อมูลที่ตรงกับเงื่อนไขการค้นหาของคุณในขณะนี้
+                </td>
+              </tr>
+            `;
+            return;
+          }
+          
+          let html = "";
+          results.forEach(item => {
+            const rowId = item.rowNum;
+            const type = item.type;
+            const d = item.data;
+            
+            let badgeColor = "bg-slate-100 text-slate-800";
+            if (type === "จต.") badgeColor = "bg-amber-100 text-amber-800 border border-amber-200";
+            else if (type === "ภน.") badgeColor = "bg-orange-100 text-orange-800 border border-orange-200";
+            else if (type === "ซข.") badgeColor = "bg-yellow-100 text-yellow-800 border border-yellow-200";
+            else if (type === "สช.") badgeColor = "bg-slate-100 text-slate-900 border border-slate-200";
+
+            const formattedDate = d["ลงวันที่"] ? d["ลงวันที่"].substring(0, 10) : "-";
+            const encodedData = encodeURIComponent(JSON.stringify(item));
+
+            html += `
+              <tr class="hover:bg-slate-50/50 transition-colors duration-100">
+                <td class="px-6 py-4 whitespace-nowrap text-xs">
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold ${badgeColor}">
+                    ${type}
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-500 font-semibold">
+                  ${formattedDate}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-xs font-bold text-slate-900">
+                  ${d["เลขที่/วันที่สัญญา"] || "-"}
+                </td>
+                <td class="px-6 py-4 text-xs text-slate-600 font-medium max-w-xs truncate">
+                  ${d["ชื่อสัญญา"] || "-"}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-xs font-bold text-slate-800">
+                  ฿${formatNumber(d["จำนวนเงิน"])}
+                </td>
+                <td class="px-6 py-4 text-xs text-slate-500 font-medium max-w-xs truncate">
+                  ${d["คู่สัญญา"] || "-"}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-xs text-center">
+                  <button onclick="editContract('${encodedData}')" class="bg-slate-900 hover:bg-amber-400 hover:text-slate-950 text-amber-400 font-bold px-4 py-2 rounded-xl transition-all duration-150 inline-flex items-center space-x-1 shadow-xs text-xs">
+                    <span>✏️ แก้ไขข้อมูล</span>
+                  </button>
+                </td>
+              </tr>
+            `;
+          });
+          tableBody.innerHTML = html;
+        } else {
+          showToast("การค้นหาติดปัญหา: " + response.error, "danger");
+        }
+      }, function(error) {
+        loader.classList.add("hidden");
+        resultsArea.classList.remove("opacity-40");
+        showToast("ไม่สามารถเรียกค้นข้อมูลได้: " + error.message, "danger");
+      });
+    }
+
+    function editContract(encodedDataString) {
+      try {
+        const item = JSON.parse(decodeURIComponent(encodedDataString));
+        const d = item.data;
+        
+        isEditing = true;
+
+        document.getElementById("form-title").innerHTML = `📝 กำลังแก้ไขข้อมูลทะเบียนสัญญา: <span class="text-amber-500">${d["เลขที่/วันที่สัญญา"]}</span>`;
+        document.getElementById("form-subtitle").innerText = "โหมดแก้ไขย้อนหลัง: คุณกำลังทำการบันทึกข้อมูลปรับปรุงข้อมูลที่มีอยู่เดิมลงทับบรรทัดเดิมของชีทโยกไฟล์ตามปี";
+        document.getElementById("btn-cancel-edit").classList.remove("hidden");
+
+        document.getElementById("edit-row-idx").value = item.rowNum;
+        document.getElementById("edit-original-type").value = item.type;
+        document.getElementById("edit-original-year").value = item.year;
+
+        document.getElementById("field-year").value = item.year;
+        document.getElementById("field-type").value = item.type;
+        
+        document.getElementById("field-year").disabled = true;
+        document.getElementById("field-type").disabled = true;
+
+        document.getElementById("field-col1").value = d["ลำดับ"] || "";
+        document.getElementById("field-col2").value = d["ลงวันที่"] ? d["ลงวันที่"].substring(0, 10) : "";
+        document.getElementById("field-col3").value = d["เลขที่/วันที่สัญญา"] || "";
+        document.getElementById("field-col4").value = d["ชื่อสัญญา"] || "";
+        document.getElementById("field-col5").value = d["จำนวนเงิน"] || "";
+        document.getElementById("field-col6").value = d["คู่สัญญา"] || "";
+        document.getElementById("field-col7").value = d["รหัสงบประมาณ"] || "";
+        document.getElementById("field-col8").value = d["จำนวนงวด"] || "";
+        document.getElementById("field-col9").value = d["วันเริ่มต้นสัญญา"] ? d["วันเริ่มต้นสัญญา"].substring(0, 10) : "";
+        document.getElementById("field-col10").value = d["วันสิ้นสุดสัญญา"] ? d["วันสิ้นสุดสัญญา"].substring(0, 10) : "";
+        document.getElementById("field-col11").value = d["การดำเนินงานพัสดุ (วิธีจัดหา)"] || "";
+        document.getElementById("field-col12").value = d["ใบขอจัดหา /บันทึก"] || "";
+        document.getElementById("field-col13").value = d["จำนวนงบประมาณ"] || "";
+        document.getElementById("field-col14").value = d["ราคากลาง"] || "";
+        document.getElementById("field-col15").value = d["รายงานขอซื้อขอจ้าง"] || "";
+        document.getElementById("field-col16").value = d["ประกาศร่าง TOR"] || "";
+        document.getElementById("field-col17").value = d["รายงานปรับปรุงร่าง TOR"] || "";
+        document.getElementById("field-col18").value = d["เลขที่ประกาศ/หนังสือเชิญ"] || "";
+        document.getElementById("field-col19").value = d["จำนวนผู้เสนอราคา"] || "";
+        document.getElementById("field-col20").value = d["วันที่ประกาศผล/ยกเลิก"] || "";
+        document.getElementById("field-col21").value = d["คำสั่ง คกก.ตรวจรับ"] || "";
+        document.getElementById("field-col22").value = d["หลักประกัน"] || "";
+        document.getElementById("field-col23").value = d["การจัดเก็บเอกสาร"] || "";
+        document.getElementById("field-col24").value = d["รับประกันความชำรุด"] || "";
+
+        validatedNoState = { isValid: true, checkingNo: d["เลขที่/วันที่สัญญา"] };
+        const warnP = document.getElementById("col3-warn");
+        const iconSpan = document.getElementById("col3-status-icon");
+        warnP.classList.add("hidden");
+        iconSpan.innerHTML = "✅";
+
+        switchTab("form");
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      } catch (e) {
+        showToast("ไม่สามารถประมวลผลข้อมูลเพื่อเข้าสู่การแก้ไขสัญญาได้", "danger");
+      }
+    }
+
+    function resetFormToSaveMode() {
+      isEditing = false;
+      document.getElementById("form-title").innerText = "เพิ่มรายละเอียดข้อมูลทะเบียนสัญญา";
+      document.getElementById("form-subtitle").innerText = "กรุณากรอกข้อมูลเพื่อบันทึกลงฐานข้อมูลพัสดุ";
+      document.getElementById("btn-cancel-edit").classList.add("hidden");
+      
+      document.getElementById("field-year").disabled = false;
+      document.getElementById("field-type").disabled = false;
+      
+      document.getElementById("edit-row-idx").value = "";
+      document.getElementById("edit-original-type").value = "";
+      document.getElementById("edit-original-year").value = "";
+
+      clearForm();
+    }
+
+    function clearForm() {
+      document.getElementById("field-col1").value = "";
+      document.getElementById("field-col2").value = "";
+      document.getElementById("field-col3").value = "";
+      document.getElementById("field-col4").value = "";
+      document.getElementById("field-col5").value = "";
+      document.getElementById("field-col6").value = "";
+      document.getElementById("field-col7").value = "";
+      document.getElementById("field-col8").value = "";
+      document.getElementById("field-col9").value = "";
+      document.getElementById("field-col10").value = "";
+      document.getElementById("field-col11").value = "";
+      document.getElementById("field-col12").value = "";
+      document.getElementById("field-col13").value = "";
+      document.getElementById("field-col14").value = "";
+      document.getElementById("field-col15").value = "";
+      document.getElementById("field-col16").value = "";
+      document.getElementById("field-col17").value = "";
+      document.getElementById("field-col18").value = "";
+      document.getElementById("field-col19").value = "";
+      document.getElementById("field-col20").value = "";
+      document.getElementById("field-col21").value = "";
+      document.getElementById("field-col22").value = "";
+      document.getElementById("field-col23").value = "";
+      document.getElementById("field-col24").value = "";
+
+      const warnP = document.getElementById("col3-warn");
+      const iconSpan = document.getElementById("col3-status-icon");
+      warnP.classList.add("hidden");
+      iconSpan.innerHTML = "";
+      validatedNoState = { isValid: true, checkingNo: "" };
+    }
+
+    function formatNumber(num) {
+      if (num === null || num === undefined || num === "") return "0.00";
+      const value = parseFloat(num);
+      if (isNaN(value)) return "0.00";
+      return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function showToast(message, type = "info") {
+      const container = document.getElementById("toast-container");
+      let themeClass = "bg-slate-900 border-l-4 border-amber-400 text-white";
+      let icon = "🔔";
+
+      if (type === "success") {
+        themeClass = "bg-emerald-950 border-l-4 border-emerald-400 text-white";
+        icon = "✅";
+      } else if (type === "danger") {
+        themeClass = "bg-rose-950 border-l-4 border-rose-500 text-white";
+        icon = "❌";
+      } else if (type === "info") {
+        themeClass = "bg-slate-950 border-l-4 border-amber-400 text-white";
+        icon = "⚡";
+      }
+
+      const toast = document.createElement("div");
+      toast.className = `p-4 mb-3 rounded-2xl shadow-lg flex items-start space-x-3 transition-all duration-300 transform translate-x-12 opacity-0 pointer-events-auto ${themeClass}`;
+      toast.innerHTML = `
+        <span class="text-sm">${icon}</span>
+        <div class="flex-1 text-xs font-semibold leading-relaxed">${message}</div>
+        <button onclick="this.parentElement.remove()" class="text-white hover:text-amber-400 focus:outline-none text-xs ml-2">✕</button>
+      `;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove("translate-x-12", "opacity-0");
+      }, 50);
+
+      setTimeout(() => {
+        toast.classList.add("translate-x-12", "opacity-0");
+        setTimeout(() => {
+          toast.remove();
+        }, 300);
+      }, 5500);
+    }
+  </script>
+</body>
+</html>
